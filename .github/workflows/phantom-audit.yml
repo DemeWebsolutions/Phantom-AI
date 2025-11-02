@@ -1,0 +1,48 @@
+name: Phantom AI
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer, phpcs
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Install PHPCS standards
+        run: |
+          composer global require \
+            wp-coding-standards/wpcs:^3 \
+            phpcompatibility/php-compatibility:^9 \
+            phpcompatibility/phpcompatibility-wp:^2 \
+            dealerdirect/phpcodesniffer-composer-installer:^1
+          phpcs --config-set installed_paths \
+            "$HOME/.composer/vendor/wp-coding-standards/wpcs,$HOME/.composer/vendor/phpcompatibility/php-compatibility,$HOME/.composer/vendor/phpcompatibility-wp"
+
+      - name: Install Semgrep
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install semgrep
+
+      - name: Run Phantom review
+        run: bash ./scripts/wp-plugin-ai-review.sh ./
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ./artifacts/phantom-report.sarif
